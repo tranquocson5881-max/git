@@ -1,0 +1,5 @@
+LibreOffice_*.msi
+lo_test.docx
+lo_test.pdf
+~$*.docx
+rendered_docx/

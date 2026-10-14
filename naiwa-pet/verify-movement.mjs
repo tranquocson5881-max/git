@@ -1,0 +1,18 @@
+import fs from 'node:fs';
+import vm from 'node:vm';
+import assert from 'node:assert/strict';
+import ts from 'typescript';
+const source = fs.readFileSync('src/main.ts', 'utf8');
+const block = source.slice(source.indexOf('let freeMovement ='), source.indexOf('const syncPetSizeChecks ='));
+const output = ts.transpileModule(block + '\nglobalThis.controls = { setFreeMovement, hover: (value) => { hoveringPet = value; } };', {compilerOptions:{target: ts.ScriptTarget.ES2022}}).outputText;
+const calls = [], timers = [];
+let position = {x:-119, y:999};
+const context = { console, Math, Date, clearTimeout: () => {}, setTimeout: fn => { timers.push(fn); return timers.length; }, pet:{addEventListener(){}}, window:{addEventListener(){}}, currentMonitor:async()=>({scaleFactor:1, workArea:{position:{x:-1920,y:0},size:{width:1920,height:1080}}}), appWindow:{outerPosition:async()=>position,outerSize:async()=>({width:180,height:240}),setPosition:async p=>{calls.push(p);position=p;}}, PhysicalPosition:class{constructor(x,y){this.x=x;this.y=y;}} };
+vm.createContext(context); vm.runInContext(output,context);
+const flush = async () => { for(let i=0;i<12;i++) await Promise.resolve(); };
+await context.controls.setFreeMovement(true); await flush();
+assert.equal(calls.length,1); assert.ok(calls[0].x>=-1920 && calls[0].x<=-180); assert.ok(calls[0].y>=0 && calls[0].y<=840);
+context.controls.hover(true); timers.shift()(); await flush(); assert.equal(calls.length,1);
+await context.controls.setFreeMovement(false); context.controls.hover(false); timers.shift()(); await flush(); assert.equal(calls.length,1);
+await context.controls.setFreeMovement(true); await context.controls.setFreeMovement(false); await flush(); assert.equal(calls.length,1);
+console.log('PASS: monitor boundaries, hover pause, stop, stale movement cancellation');
